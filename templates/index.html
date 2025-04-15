@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Ingredient Segmentation Inference</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #f9f9f9;
+        margin: 0;
+        padding: 0;
+        color: #333;
+      }
+
+      .container {
+        max-width: 960px;
+        margin: 40px auto;
+        padding: 20px;
+        background-color: #fff;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+      }
+
+      h1,
+      h2,
+      h3 {
+        text-align: center;
+        margin-bottom: 20px;
+      }
+
+      form {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-bottom: 30px;
+      }
+
+      input[type="file"] {
+        padding: 10px;
+        margin-bottom: 15px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        width: 100%;
+        max-width: 300px;
+      }
+
+      input[type="submit"],
+      button {
+        background-color: #4caf50;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 16px;
+        transition: background-color 0.3s ease;
+      }
+
+      input[type="submit"]:hover,
+      button:hover {
+        background-color: #45a049;
+      }
+
+      #preview,
+      #prediction,
+      #live-prediction {
+        max-width: 100%;
+        height: auto;
+        margin-top: 10px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+      }
+
+      #container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 30px;
+        justify-content: center;
+      }
+
+      .section {
+        flex: 1 1 300px;
+        text-align: center;
+      }
+
+      video {
+        max-width: 100%;
+        border-radius: 8px;
+        border: 1px solid #ddd;
+        margin-top: 10px;
+      }
+
+      hr {
+        margin: 40px 0;
+        border: none;
+        border-top: 1px solid #eee;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Ingredient Segmentation Inference</h1>
+
+      <!-- Upload Form -->
+      <form
+        method="POST"
+        action="/upload"
+        enctype="multipart/form-data"
+        id="uploadForm"
+      >
+        <input
+          type="file"
+          name="file"
+          id="imageInput"
+          accept="image/*"
+          capture="environment"
+          required
+        />
+        <input type="submit" value="Upload and Predict" />
+      </form>
+
+      <!-- Preview and Prediction -->
+      <div id="container">
+        <div class="section">
+          <h3>Uploaded Image</h3>
+          <img id="preview" src="" alt="Image preview will appear here" />
+        </div>
+        <div class="section">
+          <h3>Model Prediction</h3>
+          <img id="prediction" src="" alt="Model prediction will appear here" />
+        </div>
+      </div>
+
+      <hr />
+
+      <!-- Real-time Camera Prediction -->
+      <h2>Real-time Camera Prediction</h2>
+      <div id="container">
+        <div class="section">
+          <button onclick="startCamera()">Start Camera</button>
+          <video id="video" width="400" height="300" autoplay muted></video>
+        </div>
+        <div class="section">
+          <h3>Live Prediction Output</h3>
+          <img
+            id="live-prediction"
+            src=""
+            alt="Live prediction will appear here"
+          />
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Preview uploaded image
+      const imageInput = document.getElementById("imageInput");
+      const preview = document.getElementById("preview");
+      const prediction = document.getElementById("prediction");
+      const form = document.getElementById("uploadForm");
+
+      imageInput.addEventListener("change", function () {
+        const file = this.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = function (e) {
+            preview.src = e.target.result;
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+
+      // Trigger prediction image after submit
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+
+        const formData = new FormData(form);
+
+        fetch("/upload", {
+          method: "POST",
+          body: formData,
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.status === "success") {
+              prediction.src = data.prediction_path;
+            } else {
+              alert("Prediction failed: " + data.message);
+            }
+          })
+          .catch((err) => {
+            console.error("Upload error:", err);
+            alert("Upload error.");
+          });
+      });
+
+      // Camera access and frame prediction
+      function startCamera() {
+        const video = document.getElementById("video");
+        navigator.mediaDevices
+          .getUserMedia({ video: true })
+          .then((stream) => {
+            video.srcObject = stream;
+            setInterval(() => {
+              captureAndSendFrame(video);
+            }, 1500); // Every 1.5 seconds
+          })
+          .catch((err) => {
+            alert("Unable to access camera: " + err.message);
+          });
+      }
+
+      function captureAndSendFrame(video) {
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        canvas.toBlob((blob) => {
+          const formData = new FormData();
+          formData.append("frame", blob, "frame.jpg");
+
+          fetch("/predict_live", {
+            method: "POST",
+            body: formData,
+          })
+            .then((res) => res.blob())
+            .then((blob) => {
+              const imgUrl = URL.createObjectURL(blob);
+              document.getElementById("live-prediction").src = imgUrl;
+            });
+        }, "image/jpeg");
+      }
+    </script>
+  </body>
+</html>

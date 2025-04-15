@@ -1,2 +1,8 @@
-Flask
 Gunicorn
+flask
+torch
+torchvision
+pillow
+matplotlib
+scikit-image
+torch_geomteric

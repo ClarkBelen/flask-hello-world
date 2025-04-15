@@ -1,8 +1,8 @@
-Gunicorn
+gunicorn
 flask
-torch
-torchvision
+torch==2.0.1
+torchvision==0.15.2
 pillow
 matplotlib
 scikit-image
-torch_geomteric
+torch-geometric==2.3.1

@@ -39,7 +39,7 @@ checkpoint_path = "bestFinal_hybridModel.pth"
 if not hasattr(np, "scalar"):
     np.scalar = np.generic
 
-torch.serialization.add_safe_globals([np.scalar])
+# torch.serialization.add_safe_globals([np.scalar])
 checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
 
 model.load_state_dict(checkpoint["model_state_dict"])

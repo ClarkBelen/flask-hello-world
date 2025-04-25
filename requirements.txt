@@ -6,3 +6,4 @@ pillow
 matplotlib
 scikit-image
 torch-geometric==2.3.1
+numpy<2

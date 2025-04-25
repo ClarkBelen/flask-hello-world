@@ -12,7 +12,7 @@ matplotlib.use('Agg')  # Use a non-GUI backend
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from model.hybrid_model import HybridGCNGAN
-from model.utils import visualize_predictions_with_overlay_single_only
+from model.utils import visualize_predictions_pil_overlay
 
 # Set up device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -86,18 +86,18 @@ def upload():
         pred_mask = seg_probs.argmax(axis=0)
     print("UPLOAD prediction took", round(time.time() - start_time, 2), "seconds")
 
-    fig = visualize_predictions_with_overlay_single_only(
+    overlay_img =  visualize_predictions_pil_overlay(
         image_tensor.squeeze(0).cpu(),
-        torch.zeros_like(torch.from_numpy(pred_mask)),
         torch.from_numpy(pred_mask),
         torch.from_numpy(seg_probs),
         class_idx_to_name
     )
 
     buf = io.BytesIO()
-    fig.savefig(buf, format='png', bbox_inches='tight', dpi=80)
+    # fig.savefig(buf, format='png', bbox_inches='tight', dpi=80)
+    overlay_img.save(buf, format='PNG')
     buf.seek(0)
-    plt.close(fig)
+    # plt.close(fig)
 
     return send_file(buf, mimetype='image/png')
 
@@ -119,18 +119,18 @@ def predict_live():
         pred_mask = seg_probs.argmax(axis=0)
     print("LIVE prediction took", round(time.time() - start_time, 2), "seconds")
 
-    fig = visualize_predictions_with_overlay_single_only(
+    overlay_img =  visualize_predictions_pil_overlay(
         image_tensor.squeeze(0).cpu(),
-        torch.zeros_like(torch.from_numpy(pred_mask)),
         torch.from_numpy(pred_mask),
         torch.from_numpy(seg_probs),
         class_idx_to_name
     )
 
     buf = io.BytesIO()
-    fig.savefig(buf, format='png', bbox_inches='tight', dpi=80)
+    # fig.savefig(buf, format='png', bbox_inches='tight', dpi=80)
+    overlay_img.save(buf, format='PNG')
     buf.seek(0)
-    plt.close(fig)
+    # plt.close(fig)
 
     return send_file(buf, mimetype='image/png')
 

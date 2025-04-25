@@ -144,6 +144,7 @@
       <div id="container">
         <div class="section">
           <button onclick="startCamera()">Start Camera</button>
+          <button onclick="stopCamera()">Stop Camera</button>
           <video id="video" width="400" height="300" autoplay muted></video>
         </div>
         <div class="section">
@@ -185,13 +186,10 @@
           method: "POST",
           body: formData,
         })
-          .then((res) => res.json())
-          .then((data) => {
-            if (data.status === "success") {
-              prediction.src = data.prediction_path;
-            } else {
-              alert("Prediction failed: " + data.message);
-            }
+        .then((res) => res.blob())
+          .then((blob) => {
+            const imgUrl = URL.createObjectURL(blob);
+            document.getElementById("prediction").src = imgUrl;
           })
           .catch((err) => {
             console.error("Upload error:", err);
@@ -199,21 +197,66 @@
           });
       });
 
+      let stream = null;
+      let predictionInterval = null;
+
       // Camera access and frame prediction
       function startCamera() {
         const video = document.getElementById("video");
+
+        const constraints = {
+          video: {
+            facingMode: { exact: "environment" }
+          }
+        };
+
         navigator.mediaDevices
-          .getUserMedia({ video: true })
-          .then((stream) => {
+          .getUserMedia(constraints)
+          .then((mediaStream) => {
+            stream = mediaStream;
             video.srcObject = stream;
-            setInterval(() => {
+
+            predictionInterval = setInterval(() => {
               captureAndSendFrame(video);
-            }, 1500); // Every 1.5 seconds
+            }, 1500);
           })
           .catch((err) => {
-            alert("Unable to access camera: " + err.message);
+            console.warn("Back camera not found. Falling back to default...", err);
+            navigator.mediaDevices.getUserMedia({ video: true })
+              .then((mediaStream) => {
+                stream = mediaStream;
+                video.srcObject = stream;
+
+                predictionInterval = setInterval(() => {
+                  captureAndSendFrame(video);
+                }, 1500);
+              })
+              .catch((error) => {
+                alert("Unable to access any camera: " + error.message);
+                console.error("Camera error:", error);
+              });
           });
       }
+
+      function stopCamera() {
+        const video = document.getElementById("video");
+
+        // Stop the camera stream
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+          video.srcObject = null;
+        }
+
+        // Stop prediction loop
+        if (predictionInterval) {
+          clearInterval(predictionInterval);
+          predictionInterval = null;
+        }
+
+        // Optional: reset preview
+        document.getElementById("live-prediction").src = "";
+      }
+
 
       function captureAndSendFrame(video) {
         const canvas = document.createElement("canvas");

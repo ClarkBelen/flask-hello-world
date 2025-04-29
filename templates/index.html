@@ -129,11 +129,19 @@
       <div id="container">
         <div class="section">
           <h3>Uploaded Image</h3>
-          <img id="preview" src="" alt="Image preview will appear here" />
+          <img
+            id="preview"
+            src=""
+            alt="Preview of uploaded ingredient image"
+          />
         </div>
         <div class="section">
           <h3>Model Prediction</h3>
-          <img id="prediction" src="" alt="Model prediction will appear here" />
+          <img
+            id="prediction"
+            src=""
+            alt="Prediction result of uploaded image"
+          />
         </div>
       </div>
 
@@ -152,14 +160,13 @@
           <img
             id="live-prediction"
             src=""
-            alt="Live prediction will appear here"
+            alt="Live prediction output from camera"
           />
         </div>
       </div>
     </div>
 
     <script>
-      // Preview uploaded image
       const imageInput = document.getElementById("imageInput");
       const preview = document.getElementById("preview");
       const prediction = document.getElementById("prediction");
@@ -171,113 +178,100 @@
           const reader = new FileReader();
           reader.onload = function (e) {
             preview.src = e.target.result;
+            prediction.src = "";
+            prediction.alt = "Model prediction will appear here";
           };
           reader.readAsDataURL(file);
         }
       });
 
-      // Trigger prediction image after submit
-      form.addEventListener("submit", function (e) {
+      form.addEventListener("submit", async function (e) {
         e.preventDefault();
+        prediction.src = "";
+        prediction.alt = "Predicting...";
 
         const formData = new FormData(form);
 
-        fetch("/upload", {
-          method: "POST",
-          body: formData,
-        })
-        .then((res) => res.blob())
-          .then((blob) => {
-            const imgUrl = URL.createObjectURL(blob);
-            document.getElementById("prediction").src = imgUrl;
-          })
-          .catch((err) => {
-            console.error("Upload error:", err);
-            alert("Upload error.");
+        try {
+          const res = await fetch("/upload", {
+            method: "POST",
+            body: formData,
           });
+          const blob = await res.blob();
+          const imgUrl = URL.createObjectURL(blob);
+          prediction.src = imgUrl;
+          prediction.alt = "Model prediction result";
+        } catch (err) {
+          console.error("Upload error:", err);
+          alert("Upload error.");
+          prediction.alt = "Failed to predict image.";
+        }
       });
 
       let stream = null;
       let predictionInterval = null;
 
-      // Camera access and frame prediction
-      function startCamera() {
+      async function startCamera() {
         const video = document.getElementById("video");
+        const constraints = { video: { facingMode: { exact: "environment" } } };
 
-        const constraints = {
-          video: {
-            facingMode: { exact: "environment" }
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+        } catch (err) {
+          console.warn("Back camera not found. Trying default...", err);
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          } catch (error) {
+            alert("Unable to access any camera: " + error.message);
+            console.error("Camera error:", error);
+            return;
           }
-        };
+        }
 
-        navigator.mediaDevices
-          .getUserMedia(constraints)
-          .then((mediaStream) => {
-            stream = mediaStream;
-            video.srcObject = stream;
-
-            predictionInterval = setInterval(() => {
-              captureAndSendFrame(video);
-            }, 1500);
-          })
-          .catch((err) => {
-            console.warn("Back camera not found. Falling back to default...", err);
-            navigator.mediaDevices.getUserMedia({ video: true })
-              .then((mediaStream) => {
-                stream = mediaStream;
-                video.srcObject = stream;
-
-                predictionInterval = setInterval(() => {
-                  captureAndSendFrame(video);
-                }, 1500);
-              })
-              .catch((error) => {
-                alert("Unable to access any camera: " + error.message);
-                console.error("Camera error:", error);
-              });
-          });
+        video.srcObject = stream;
+        predictionInterval = setInterval(() => {
+          captureAndSendFrame(video);
+        }, 1500);
       }
 
       function stopCamera() {
         const video = document.getElementById("video");
-
-        // Stop the camera stream
         if (stream) {
-          stream.getTracks().forEach(track => track.stop());
+          stream.getTracks().forEach((track) => track.stop());
           video.srcObject = null;
         }
 
-        // Stop prediction loop
         if (predictionInterval) {
           clearInterval(predictionInterval);
           predictionInterval = null;
         }
 
-        // Optional: reset preview
         document.getElementById("live-prediction").src = "";
+        document.getElementById("live-prediction").alt = "Live prediction cleared.";
       }
 
-
-      function captureAndSendFrame(video) {
+      async function captureAndSendFrame(video) {
         const canvas = document.createElement("canvas");
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         const ctx = canvas.getContext("2d");
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        canvas.toBlob((blob) => {
+        canvas.toBlob(async (blob) => {
           const formData = new FormData();
           formData.append("frame", blob, "frame.jpg");
 
-          fetch("/predict_live", {
-            method: "POST",
-            body: formData,
-          })
-            .then((res) => res.blob())
-            .then((blob) => {
-              const imgUrl = URL.createObjectURL(blob);
-              document.getElementById("live-prediction").src = imgUrl;
+          try {
+            const res = await fetch("/predict_live", {
+              method: "POST",
+              body: formData,
             });
+            const predictionBlob = await res.blob();
+            document.getElementById("live-prediction").src = URL.createObjectURL(predictionBlob);
+            document.getElementById("live-prediction").alt = "Live prediction image";
+          } catch (err) {
+            console.error("Live prediction error:", err);
+          }
         }, "image/jpeg");
       }
     </script>

@@ -10,55 +10,46 @@ from torchvision import transforms
 import matplotlib
 matplotlib.use('Agg')  # Use a non-GUI backend
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
+
 from model.hybrid_model import HybridGCNGAN
 from model.utils import visualize_predictions_with_overlay_single_only
 
-# Set up device
+# Set device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Define number of classes
-num_classes = 11
-class_idx_to_name = {
-    1: "Boiled Egg",
-    2: "Chayote",
-    3: "Chicken",
-    4: "Egg Sunny Side Up",
-    5: "Green Leaf Vegetable",
-    6: "Pasta",
-    7: "Pork",
-    8: "Potato",
-    9: "Rice",
-    10: "Scrambled Egg"
-}
+# Class names (index 0 is background)
+class_names = [
+    "__background__",
+    "Boiled Egg", "Chayote", "Chicken", "Egg Sunny Side Up",
+    "Green Leaf Vegetable", "Pasta", "Pork", "Potato", "Rice", "Scrambled Egg"
+]
+num_classes = len(class_names)
 skip_channels = 24
 
-# Lazy-loaded model
-model = None
+# Model checkpoint path
 checkpoint_path = "bestFinal_hybridModel.pth"
+model = None  # Global instance
 
+# Model loading function
 def load_model():
     global model
     if model is None:
         print("Loading model...")
         model_instance = HybridGCNGAN(num_classes=num_classes, skip_channels=skip_channels)
-        if not hasattr(np, "scalar"):
-            np.scalar = np.generic
         checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
         model_instance.load_state_dict(checkpoint["model_state_dict"])
-        print(f"Best training from epoch {checkpoint['epoch'] + 1} with best mIoU: {checkpoint['best_miou']:.4f}, best accuracy: {checkpoint['best_acc']:.4f}")
-        model_instance.to(device)
-        model_instance.eval()
+        print(f"Loaded checkpoint from epoch {checkpoint['epoch'] + 1} | mIoU: {checkpoint['best_miou']:.4f}, Acc: {checkpoint['best_acc']:.4f}")
+        model_instance.to(device).eval()
         model = model_instance
     return model
 
-# Transform
+# Image transform
 transform = transforms.Compose([
     transforms.Resize((320, 320)),
     transforms.ToTensor(),
 ])
 
-# Flask app
+# Initialize Flask app
 app = Flask(__name__)
 
 @app.route('/')
@@ -79,23 +70,25 @@ def upload():
 
     model_instance = load_model()
 
+    # Inference
     start_time = time.time()
     with torch.no_grad():
         pred = model_instance(image_tensor)
-        seg_probs = torch.softmax(pred, dim=1).cpu().numpy()[0]
-        pred_mask = seg_probs.argmax(axis=0)
+        seg_probs = torch.softmax(pred, dim=1).cpu().numpy()[0]  # [C, H, W]
+        pred_mask = seg_probs.argmax(axis=0)  # [H, W]
     print("UPLOAD prediction took", round(time.time() - start_time, 2), "seconds")
 
+    # Visualization
     fig = visualize_predictions_with_overlay_single_only(
         image_tensor.squeeze(0).cpu(),
-        torch.zeros_like(torch.from_numpy(pred_mask)),
+        torch.zeros_like(torch.from_numpy(pred_mask)),  # placeholder for gt_mask
         torch.from_numpy(pred_mask),
         torch.from_numpy(seg_probs),
-        class_idx_to_name
+        class_names
     )
 
     buf = io.BytesIO()
-    fig.savefig(buf, format='png', bbox_inches='tight', dpi=80)
+    fig.savefig(buf, format='png', bbox_inches='tight', dpi=100)
     buf.seek(0)
     plt.close(fig)
 
@@ -124,11 +117,11 @@ def predict_live():
         torch.zeros_like(torch.from_numpy(pred_mask)),
         torch.from_numpy(pred_mask),
         torch.from_numpy(seg_probs),
-        class_idx_to_name
+        class_names
     )
 
     buf = io.BytesIO()
-    fig.savefig(buf, format='png', bbox_inches='tight', dpi=80)
+    fig.savefig(buf, format='png', bbox_inches='tight', dpi=100)
     buf.seek(0)
     plt.close(fig)
 

@@ -1,13 +1,13 @@
 # --- utils.py ---
 import matplotlib
-matplotlib.use('Agg')  # Use a non-GUI backend
+matplotlib.use('Agg')  # Use a non-GUI backend for server-side rendering
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import numpy as np
 
 def visualize_predictions_with_overlay_single_only(image_tensor, gt_mask, pred_mask, seg_probs, class_names):
     num_classes = len(class_names)
-    cmap = plt.get_cmap('tab20', num_classes)
+    cmap = plt.get_cmap('tab20', num_classes)  # Balanced and distinguishable colors
 
     image = image_tensor.permute(1, 2, 0).cpu().numpy()
     pred_mask = pred_mask.cpu().numpy()
@@ -28,13 +28,12 @@ def visualize_predictions_with_overlay_single_only(image_tensor, gt_mask, pred_m
         patch = mpatches.Patch(color=cmap(cls_id), label=label_str)
         legend_entries.append(patch)
 
-    fig, axs = plt.subplots(1, 1, figsize=(6, 6))
-    axs.imshow(image, alpha=0.7)
-    axs.imshow(pred_mask, cmap=cmap, alpha=0.5, vmin=0, vmax=num_classes - 1)
-    axs.set_title("Predicted Overlay + Confidence")
+    fig, axs = plt.subplots(figsize=(6, 6))
+    axs.imshow(image, alpha=0.75)
+    axs.imshow(pred_mask, cmap=cmap, alpha=0.4, vmin=0, vmax=num_classes - 1)
     axs.axis('off')
 
-    fig.legend(handles=legend_entries, loc='lower center', ncol=3, bbox_to_anchor=(0.5, -0.05))
-    plt.tight_layout()
+    fig.legend(handles=legend_entries, loc='lower center', ncol=3, bbox_to_anchor=(0.5, -0.08))
+    plt.tight_layout(pad=2.0)
 
     return fig

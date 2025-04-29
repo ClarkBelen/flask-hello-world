@@ -37,3 +37,4 @@ def visualize_predictions_with_overlay_single_only(image_tensor, gt_mask, pred_m
     plt.tight_layout(pad=2.0)
 
     return fig
+
